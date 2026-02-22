@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Abir Tube</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- সাইডবার নেভিগেশন -->
+        <nav id="sidebar">
+            <div class="logo">Abir Tube</div>
+            <div class="nav-item focusable" data-action="home">🏠 Home</div>
+            <div class="nav-item focusable" data-action="trending">🔥 Trending</div>
+            <div class="nav-item focusable" data-action="music">🎵 Music</div>
+            <div class="nav-item focusable" data-action="search">🔍 Search</div>
+        </nav>
+
+        <!-- মূল কন্টেন্ট এরিয়া -->
+        <main id="main-content">
+            <div id="search-container" class="hidden">
+                <input type="text" id="search-input" class="focusable" placeholder="ভিডিও খুঁজুন...">
+                <button id="search-btn" class="focusable">Search</button>
+            </div>
+            
+            <h2 id="page-title">Trending</h2>
+            
+            <div id="video-grid">
+                <!-- ভিডিও থাম্বনেইলগুলো এখানে লোড হবে -->
+            </div>
+        </main>
+    </div>
+
+    <!-- ফুলস্ক্রিন ভিডিও প্লেয়ার -->
+    <div id="player-modal" class="hidden">
+        <iframe id="video-player" frameborder="0" allowfullscreen></iframe>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
