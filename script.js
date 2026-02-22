@@ -1,4 +1,12 @@
-const API_BASE = "https://pipedapi.kavin.rocks";
+// একাধিক Piped API সার্ভারের লিস্ট (একটি কাজ না করলে অন্যটি ট্রাই করবে)
+const API_INSTANCES = [
+    "https://api.piped.projectsegfau.lt",
+    "https://pipedapi.tokhmi.xyz",
+    "https://piped-api.lunar.icu",
+    "https://pipedapi.smnz.de",
+    "https://pipedapi.kavin.rocks"
+];
+
 let currentFocus = null;
 
 // রিমোট কন্ট্রোল ফোকাস লজিক
@@ -7,7 +15,6 @@ function setFocus(el) {
     currentFocus = el;
     if (currentFocus) {
         currentFocus.classList.add('focused');
-        // স্ক্রিনে যাতে সবসময় ফোকাস করা আইটেম দেখা যায়
         currentFocus.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
     }
 }
@@ -43,7 +50,6 @@ function navigate(direction) {
             const dx = center.x - currCenter.x;
             const dy = center.y - currCenter.y;
             
-            // দিক অনুযায়ী দূরত্ব হিসাব করা (Weighting)
             let distance;
             if (direction === 'ArrowLeft' || direction === 'ArrowRight') {
                 distance = Math.abs(dx) + Math.abs(dy) * 5; 
@@ -65,7 +71,6 @@ function navigate(direction) {
 document.addEventListener('keydown', (e) => {
     const playerModal = document.getElementById('player-modal');
     
-    // ভিডিও প্লেয়ার ওপেন থাকলে Back বা Esc দিয়ে বন্ধ করা
     if (!playerModal.classList.contains('hidden')) {
         if (e.key === 'Backspace' || e.key === 'Escape') {
             closePlayer();
@@ -73,7 +78,6 @@ document.addEventListener('keydown', (e) => {
         return;
     }
 
-    // Input ফিল্ডে টেক্সট এডিট করার জন্য বাম/ডান অ্যারো স্বাভাবিক রাখা
     if (currentFocus && currentFocus.tagName === 'INPUT') {
         if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') return;
     }
@@ -86,34 +90,56 @@ document.addEventListener('keydown', (e) => {
         if (currentFocus) {
             currentFocus.click();
             if (currentFocus.tagName === 'INPUT') {
-                currentFocus.focus(); // টিভির কীবোর্ড ওপেন করতে
+                currentFocus.focus();
             }
         }
     }
 });
 
-// API থেকে ডেটা আনা
+// মাল্টিপল সার্ভার চেক করে ডেটা আনার ফাংশন
+async function fetchWithFallback(endpoint) {
+    for (let api of API_INSTANCES) {
+        try {
+            console.log(`Trying API: ${api}`);
+            const res = await fetch(`${api}${endpoint}`);
+            if (res.ok) {
+                const data = await res.json();
+                return data; // সফল হলে ডেটা রিটার্ন করবে
+            }
+        } catch (err) {
+            console.warn(`Failed with ${api}, trying next...`);
+        }
+    }
+    throw new Error("সবগুলো API সার্ভার ডাউন আছে!");
+}
+
+// ট্রেন্ডিং ভিডিও লোড করা
 async function loadTrending() {
     const grid = document.getElementById('video-grid');
-    grid.innerHTML = '<h3 style="margin-left:20px;">ভিডিও লোড হচ্ছে...</h3>';
+    grid.innerHTML = '<h3 style="margin-left:20px;">ভিডিও লোড হচ্ছে, দয়া করে অপেক্ষা করুন...</h3>';
     try {
-        const res = await fetch(`${API_BASE}/trending?region=US`);
-        const data = await res.json();
+        const data = await fetchWithFallback('/trending?region=US');
         renderVideos(data);
     } catch (err) {
-        grid.innerHTML = '<h3 style="margin-left:20px;">ভিডিও লোড করতে সমস্যা হয়েছে!</h3>';
+        grid.innerHTML = '<h3 style="margin-left:20px; color:red;">ভিডিও লোড করতে সমস্যা হয়েছে! কিছুক্ষণ পর আবার চেষ্টা করুন।</h3>';
+        console.error(err);
     }
 }
 
+// ভিডিও সার্চ করা
 async function fetchSearch(query) {
     const grid = document.getElementById('video-grid');
     grid.innerHTML = '<h3 style="margin-left:20px;">খোঁজা হচ্ছে...</h3>';
     try {
-        const res = await fetch(`${API_BASE}/search?q=${encodeURIComponent(query)}&filter=videos`);
-        const data = await res.json();
-        renderVideos(data.items);
+        const data = await fetchWithFallback(`/search?q=${encodeURIComponent(query)}&filter=videos`);
+        if (data.items && data.items.length > 0) {
+            renderVideos(data.items);
+        } else {
+            grid.innerHTML = '<h3 style="margin-left:20px;">কোনো ভিডিও পাওয়া যায়নি!</h3>';
+        }
     } catch (err) {
-        grid.innerHTML = '<h3 style="margin-left:20px;">কিছু পাওয়া যায়নি!</h3>';
+        grid.innerHTML = '<h3 style="margin-left:20px; color:red;">সার্চ করতে সমস্যা হয়েছে!</h3>';
+        console.error(err);
     }
 }
 
@@ -122,10 +148,15 @@ function renderVideos(videos) {
     const grid = document.getElementById('video-grid');
     grid.innerHTML = '';
     
+    if (!videos || videos.length === 0) {
+        grid.innerHTML = '<h3 style="margin-left:20px;">কোনো ভিডিও পাওয়া যায়নি!</h3>';
+        return;
+    }
+
     let isFirst = true;
 
     videos.forEach(video => {
-        if (!video.url.startsWith('/watch')) return;
+        if (!video.url || !video.url.startsWith('/watch')) return;
         
         const videoId = video.url.split('v=')[1];
         const card = document.createElement('div');
@@ -134,19 +165,18 @@ function renderVideos(videos) {
         
         card.innerHTML = `
             <div class="thumbnail-container">
-                <img src="${video.thumbnail}" alt="${video.title}">
+                <img src="${video.thumbnail}" alt="Thumbnail" loading="lazy">
                 <div class="duration">${formatTime(video.duration)}</div>
             </div>
             <div class="video-info">
                 <h3>${video.title}</h3>
-                <p>${video.uploaderName} • ${video.views || 0} views</p>
+                <p>${video.uploaderName} • ${video.views ? video.views.toLocaleString() : 0} views</p>
             </div>
         `;
         
         card.addEventListener('click', () => openPlayer(videoId));
         grid.appendChild(card);
         
-        // গ্রিড লোড হওয়ার পর প্রথম ভিডিওতে ফোকাস করা
         if (isFirst && document.getElementById('search-container').classList.contains('hidden')) {
             setFocus(card);
             isFirst = false;
@@ -195,25 +225,27 @@ document.getElementById('search-btn').addEventListener('click', () => {
     if (query) fetchSearch(query);
 });
 
-// ভিডিও প্লেয়ার
+// ভিডিও প্লেয়ার (YouTube No-cookie ব্যবহার করা হয়েছে নিরবিচ্ছিন্ন ভিডিওর জন্য)
 function openPlayer(videoId) {
     const modal = document.getElementById('player-modal');
     const iframe = document.getElementById('video-player');
-    // Piped এর নিজস্ব এম্বেড প্লেয়ার ব্যবহার করা হচ্ছে
-    iframe.src = `https://piped.video/embed/${videoId}?autoplay=1`;
+    iframe.src = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`;
     modal.classList.remove('hidden');
 }
 
 function closePlayer() {
     const modal = document.getElementById('player-modal');
     const iframe = document.getElementById('video-player');
-    iframe.src = '';
+    iframe.src = ''; // ভিডিও বন্ধ করে দেয়া
     modal.classList.add('hidden');
+    
+    // প্লেয়ার বন্ধ করার পর গ্রিডে ফোকাস ফিরিয়ে আনা
+    const firstVideo = document.querySelector('.video-card');
+    if (firstVideo) setFocus(firstVideo);
 }
 
 // অ্যাপ চালু হলে শুরুতে ডিফল্টভাবে Trending লোড করা
 window.onload = () => {
     loadTrending();
-    // প্রাথমিকভাবে Home বাটনে ফোকাস রাখা
     setFocus(document.querySelector('[data-action="home"]'));
 };
